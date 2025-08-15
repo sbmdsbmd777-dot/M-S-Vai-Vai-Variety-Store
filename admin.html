@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Admin Panel — MS Vai Vai Variety Store</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<style>
+  body{font-family:Inter,system-ui,Arial;margin:0;background:#f4f6f8}
+  header{background:#111;color:#fff;padding:14px;text-align:center}
+  .container{max-width:1000px;margin:0 auto;padding:16px}
+  .card{background:#fff;border-radius:12px;box-shadow:0 8px 20px rgba(0,0,0,.05);padding:16px;margin-bottom:16px}
+  input,select,button{padding:10px;border-radius:10px;border:1px solid #e5e7eb}
+  button{cursor:pointer}
+  table{width:100%;border-collapse:collapse}
+  th,td{padding:10px;border-bottom:1px solid #eee;text-align:left}
+  th{background:#f8fafc}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+</style>
+</head>
+<body>
+<header><h2>Admin Panel</h2></header>
+<div class="container">
+  <div id="loginCard" class="card">
+    <h3>Admin Login</h3>
+    <div class="row"><input id="email" type="email" placeholder="Email"><input id="password" type="password" placeholder="Password"><button onclick="login()">Login</button></div>
+    <p style="font-size:12px;color:#666">লগইনের পর ডেটা স্বয়ংক্রিয়ভাবে লোড হবে।</p>
+  </div>
+
+  <div id="app" style="display:none">
+    <div class="card">
+      <h3>New Product</h3>
+      <div class="row">
+        <input id="pName" placeholder="Name" style="flex:1">
+        <input id="pPrice" type="number" placeholder="Price">
+        <input id="pCat" placeholder="Category (spices/oil/snacks/combo)">
+        <input id="pImg" placeholder="Image URL">
+        <input id="pStock" type="number" placeholder="Stock">
+        <button onclick="addProduct()">Add</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Products</h3>
+      <table>
+        <thead><tr><th>Image</th><th>Name</th><th>Cat</th><th>Price</th><th>Stock</th><th></th></tr></thead>
+        <tbody id="prodBody"></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h3>Orders</h3>
+      <table>
+        <thead><tr><th>ID</th><th>Customer</th><th>Total</th><th>Status</th><th>When</th><th></th></tr></thead>
+        <tbody id="ordBody"></tbody>
+      </table>
+    </div>
+
+    <div class="row" style="justify-content:flex-end;margin:12px 0">
+      <button onclick="logout()">Logout</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const sb = window.supabase.createClient("{{SUPABASE_URL}}","{{SUPABASE_ANON_KEY}}",{auth:{persistSession:true}});
+
+function fp(){ const n=navigator; return btoa([n.platform,n.userAgent,screen.width,screen.height].join('|')) }
+let token=null;
+
+async function login(){
+  const email=document.getElementById('email').value.trim();
+  const password=document.getElementById('password').value.trim();
+  const { data, error } = await sb.auth.signInWithPassword({email,password});
+  if(error) return alert(error.message);
+  token = data.session.access_token;
+  document.getElementById('loginCard').style.display='none';
+  document.getElementById('app').style.display='block';
+  await loadProducts(); await loadOrders();
+}
+
+async function logout(){ await sb.auth.signOut(); location.reload() }
+
+async function loadProducts(){
+  const res = await fetch('/api/products'); const ps = await res.json();
+  const tb=document.getElementById('prodBody'); tb.innerHTML='';
+  ps.forEach(p=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td><img src="${p.image||'https://picsum.photos/seed/'+p._id+'/80/60'}" style="width:60px;height:45px;border-radius:8px;object-fit:cover"></td>
+      <td>${p.name}</td><td>${p.category||'-'}</td><td>৳${p.price}</td><td>${p.stock??0}</td>
+      <td>
+        <button onclick='delProduct("${p._id}")'>Delete</button>
+      </td>`;
+    tb.appendChild(tr);
+  });
+}
+async function addProduct(){
+  const body={
+    name:document.getElementById('pName').value.trim(),
+    price:Number(document.getElementById('pPrice').value),
+    category:document.getElementById('pCat').value.trim(),
+    image:document.getElementById('pImg').value.trim(),
+    stock:Number(document.getElementById('pStock').value||0)
+  };
+  if(!body.name||!body.price) return alert('Name/Price required');
+  const res = await fetch('/api/products', {
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+token,'x-device-fp':fp()},
+    body: JSON.stringify(body)
+  });
+  const d=await res.json(); if(!res.ok) return alert(d.error||'Failed');
+  await loadProducts(); alert('Product added');
+}
+async function delProduct(id){
+  if(!confirm('Delete this product?')) return;
+  const res = await fetch('/api/products/'+id, { method:'DELETE', headers:{'Authorization':'Bearer '+token,'x-device-fp':fp()} });
+  const d=await res.json(); if(!res.ok) return alert(d.error||'Failed');
+  await loadProducts();
+}
+
+async function loadOrders(){
+  const res = await fetch('/api/orders', { headers:{'Authorization':'Bearer '+token,'x-device-fp':fp()} });
+  const os = await res.json();
+  const tb=document.getElementById('ordBody'); tb.innerHTML='';
+  os.forEach(o=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${o._id}</td><td>${o.name||o.email}</td><td>৳${o.total}</td>
+      <td>${o.status}</td><td>${new Date(o.createdAt).toLocaleString()}</td>
+      <td>
+        <button onclick='updOrder("${o._id}","processing")'>Processing</button>
+        <button onclick='updOrder("${o._id}","delivered")'>Delivered</button>
+        <button onclick='updOrder("${o._id}","cancelled")'>Cancel</button>
+      </td>`;
+    tb.appendChild(tr);
+  });
+}
+async function updOrder(id,status){
+  const res = await fetch('/api/orders/'+id, {
+    method:'PUT',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+token,'x-device-fp':fp()},
+    body: JSON.stringify({ status })
+  });
+  const d=await res.json(); if(!res.ok) return alert(d.error||'Failed');
+  await loadOrders();
+}
+</script>
+</body>
+</html>
