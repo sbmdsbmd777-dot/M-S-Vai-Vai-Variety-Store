@@ -1,0 +1,14 @@
+{
+  "name": "ms-vai-vai-variety-store",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vercel dev",
+    "start": "node api/server.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "mongodb": "^6.8.0"
+  }
+}
