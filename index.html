@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>MS Vai Vai Variety Store — আপনার নিকটস্থ মুদি</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --brand:#16a34a; --accent:#f59e0b; --bg:#fafafa; --text:#111; --muted:#666; --card:#fff;
+    --ok:#22c55e; --warn:#f59e0b; --danger:#ef4444; --shadow:0 10px 25px rgba(0,0,0,.07); --radius:18px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:15px/1.5 Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;color:var(--text);background:var(--bg)}
+  a{color:inherit;text-decoration:none}
+  .container{max-width:1100px;margin:0 auto;padding:0 14px}
+  .top{background:#fff;position:sticky;top:0;z-index:50;box-shadow:var(--shadow)}
+  .top .row{display:flex;align-items:center;gap:10px;padding:10px 0}
+  .logo{font-weight:800;font-size:20px;color:var(--brand);letter-spacing:.5px}
+  .search{flex:1;display:flex;background:#f3f4f6;border-radius:999px;overflow:hidden}
+  .search input{border:0;outline:0;background:transparent;padding:10px 14px;width:100%}
+  .pill{background:#f3f4f6;border-radius:999px;padding:8px 12px;cursor:pointer;white-space:nowrap}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:12px;padding:10px 14px;cursor:pointer}
+  .btn.primary{background:var(--brand);color:#fff}
+  .btn.ghost{background:#fff;border:1px solid #ececec}
+  .btn.icon{padding:8px;border-radius:10px}
+  .badge{background:var(--brand);color:#fff;border-radius:999px;padding:2px 8px;font-size:12px}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+  .chip{background:#fff;border:1px solid #eee;border-radius:999px;padding:8px 12px;cursor:pointer}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px}
+  .card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:12px;display:flex;flex-direction:column}
+  .card img{width:100%;height:140px;object-fit:cover;border-radius:14px}
+  .title{font-weight:600;margin:8px 0 2px}
+  .muted{color:var(--muted);font-size:13px}
+  .price{font-weight:800;margin:6px 0}
+  .qty{display:flex;align-items:center;gap:8px}
+  .qty button{width:28px;height:28px;border-radius:8px;border:1px solid #eee;background:#fff;cursor:pointer}
+  .drawer{position:fixed;right:0;top:0;width:360px;max-width:95vw;height:100%;background:#fff;box-shadow:-10px 0 30px rgba(0,0,0,.1);transform:translateX(100%);transition:.25s;z-index:60;display:flex;flex-direction:column}
+  .drawer.open{transform:none}
+  .drawer header{display:flex;align-items:center;justify-content:space-between;padding:14px;border-bottom:1px solid #f0f0f0}
+  .drawer .items{flex:1;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:10px}
+  .cart-item{display:grid;grid-template-columns:56px 1fr auto;gap:10px;align-items:center;background:#fafafa;border-radius:12px;padding:8px}
+  .cart-item img{width:56px;height:56px;object-fit:cover;border-radius:10px}
+  .drawer footer{padding:14px;border-top:1px solid #f0f0f0}
+  .row{display:flex;align-items:center;gap:10px}
+  .spread{display:flex;justify-content:space-between;align-items:center}
+  section{padding:14px 0 28px}
+  h2{margin:10px 0 14px}
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;place-items:center;z-index:70}
+  .modal.open{display:grid}
+  .sheet{width:min(520px,92vw);background:#fff;border-radius:16px;box-shadow:var(--shadow);padding:16px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  input,select,textarea{width:100%;padding:10px 12px;border-radius:10px;border:1px solid #e5e7eb;outline:0}
+  .help{font-size:12px;color:var(--muted)}
+  footer.site{background:#fff;border-top:1px solid #eee;padding:20px;margin-top:30px}
+  .small{font-size:12px;color:#888}
+</style>
+</head>
+<body>
+<div class="top">
+  <div class="container row">
+    <div class="logo">MS Vai Vai <span style="color:#111">Variety Store</span></div>
+    <div class="search"><input id="search" placeholder="আজ কী লাগবে? (oil, rice, spices)" /></div>
+    <button class="btn icon ghost" id="btnSupport" title="Support">💬</button>
+    <button class="btn icon ghost" id="btnProfile" title="Profile">👤</button>
+    <button class="btn icon primary" id="btnCart" title="Cart">🛒 <span id="cartCount" class="badge">0</span></button>
+  </div>
+</div>
+
+<div class="container">
+  <div class="chips">
+    <span class="chip" data-cat="all">সব</span><span class="chip" data-cat="spices">মসলা</span>
+    <span class="chip" data-cat="oil">তেল</span><span class="chip" data-cat="snacks">স্ন্যাকস</span>
+    <span class="chip" data-cat="combo">কম্বো</span><span class="chip" data-cat="best">বেস্ট প্রাইস</span>
+  </div>
+
+  <div class="row" style="overflow:auto;gap:10px;margin-bottom:10px">
+    <div class="pill">⚡ Flash deal</div><div class="pill">🚚 Free delivery</div>
+    <div class="pill">🏪 Dhaka stock</div><div class="pill">⭐ Top rated</div>
+  </div>
+
+  <section>
+    <h2>ফিচারড প্রোডাক্ট</h2>
+    <div id="grid" class="grid"></div>
+  </section>
+</div>
+
+<!-- Cart Drawer -->
+<aside id="drawer" class="drawer">
+  <header>
+    <div class="row"><strong>আপনার কার্ট</strong><span id="cartItemsBadge" class="badge">0</span></div>
+    <button class="btn icon ghost" onclick="toggleDrawer(false)">✖</button>
+  </header>
+  <div class="items" id="cartItems"></div>
+  <footer>
+    <div class="spread"><div>সাবটোটাল</div><div id="subtotal" class="price">৳0</div></div>
+    <div class="spread"><div>ডেলিভারি</div><div id="shipping">৳40</div></div>
+    <div class="spread" style="font-weight:800"><div>মোট</div><div id="grand" class="price">৳0</div></div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn ghost" onclick="clearCart()">কার্ট ক্লিয়ার</button>
+      <button class="btn primary" onclick="beginCheckout()">Place Order</button>
+    </div>
+    <div class="help">চেকআউটে সাইন ইন আবশ্যক।</div>
+  </footer>
+</aside>
+
+<!-- Modals: Auth, Checkout, Profile, Support -->
+<div id="modalAuth" class="modal"><div class="sheet">
+  <h3>লগইন / সাইন-আপ</h3>
+  <div class="grid2">
+    <div><label>ইমেইল</label><input id="authEmail" type="email" placeholder="you@example.com"/></div>
+    <div><label>পাসওয়ার্ড</label><input id="authPass" type="password" placeholder="••••••••"/></div>
+  </div>
+  <div class="row" style="margin-top:12px">
+    <button class="btn primary" onclick="authSignup()">Sign up</button>
+    <button class="btn ghost" onclick="authLogin()">Login</button>
+    <button class="btn" onclick="closeModal('modalAuth')">Cancel</button>
+  </div>
+  <div class="help">ইমেইল/পাসওয়ার্ড Auth – Supabase।</div>
+</div></div>
+
+<div id="modalCheckout" class="modal"><div class="sheet">
+  <h3>ডেলিভারি ডিটেইলস</h3>
+  <div class="grid2">
+    <div><label>নাম</label><input id="chkName" /></div>
+    <div><label>মোবাইল</label><input id="chkPhone" /></div>
+  </div>
+  <div style="margin-top:8px">
+    <label>ঠিকানা / লোকেশন</label>
+    <input id="chkAddress" placeholder="হাউস/রোড, এরিয়া, সিটি" />
+    <div class="row" style="margin-top:6px">
+      <input id="chkLat" placeholder="Lat" />
+      <input id="chkLng" placeholder="Lng" />
+      <button class="btn ghost" onclick="alert('লাইভে Google Maps Picker যুক্ত করুন')">🗺️ Map picker</button>
+    </div>
+  </div>
+  <div class="grid2" style="margin-top:8px">
+    <div><label>পেমেন্ট</label>
+      <select id="chkPay"><option value="cod">Cash on Delivery</option><option value="online">Online</option></select>
+    </div>
+    <div><label>নোট</label><input id="chkNote" placeholder="যেমন: ডোরবেল দিবেন না" /></div>
+  </div>
+  <div class="spread" style="margin-top:12px"><div>মোট</div><div id="chkTotal" class="price">৳0</div></div>
+  <div class="row" style="margin-top:10px">
+    <button class="btn primary" onclick="placeOrder()">Confirm Order</button>
+    <button class="btn" onclick="closeModal('modalCheckout')">Cancel</button>
+  </div>
+</div></div>
+
+<div id="modalProfile" class="modal"><div class="sheet">
+  <h3>প্রোফাইল</h3>
+  <div class="grid2"><div><label>নাম</label><input id="pName"/></div><div><label>ফোন</label><input id="pPhone"/></div></div>
+  <div style="margin-top:8px"><label>ইমেইল</label><input id="pEmail" disabled/></div>
+  <div class="row" style="margin-top:12px">
+    <button class="btn primary" onclick="saveProfile()">Save</button>
+    <button class="btn ghost" onclick="authLogout()">Logout</button>
+    <button class="btn" onclick="closeModal('modalProfile')">Close</button>
+  </div>
+</div></div>
+
+<div id="modalSupport" class="modal"><div class="sheet">
+  <h3>কাস্টমার সাপোর্ট</h3>
+  <p>আমাদের সাথে হোয়াটসঅ্যাপ / কল করুন:</p>
+  <div class="row">
+    <a class="btn ghost" href="https://wa.me/8801700000000" target="_blank">WhatsApp</a>
+    <a class="btn ghost" href="tel:+8801700000000">📞 Call</a>
+  </div>
+  <p class="help">লাইভে ইন-অ্যাপ চ্যাট/টিকিটিংও যুক্ত করা যাবে।</p>
+  <div class="row"><button class="btn" onclick="closeModal('modalSupport')">Close</button></div>
+</div></div>
+
+<footer class="site">
+  <div class="container spread">
+    <div>© <span id="year"></span> MS Vai Vai Variety Store • All rights reserved</div>
+    <div class="small"><a href="#">Terms</a> • <a href="#">Privacy</a> • <a href="#">Refund</a></div>
+  </div>
+</footer>
+
+<script>
+/* ---------- Supabase setup (no edit needed) ---------- */
+const SUPABASE_URL = "{{SUPABASE_URL}}";          // Vercel inject করবে (headers দিয়ে) — client-side এ literal রাখা নিরাপদ না,
+const SUPABASE_ANON = "{{SUPABASE_ANON_KEY}}";    // তাই আমরা নিচে runtime fetch দিয়ে টোকেন-ভিত্তিক কল করব।
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON, { auth: { persistSession: true } });
+
+/* ---------- Local state ---------- */
+const LS = {
+  get(k,def){ try{return JSON.parse(localStorage.getItem(k)) ?? def}catch{ return def } },
+  set(k,v){ localStorage.setItem(k, JSON.stringify(v)) }
+};
+const state = {
+  products: [],
+  cart: LS.get('cart', []),
+  user: null
+};
+function saveAll(){ LS.set('cart',state.cart); }
+const grid = document.getElementById('grid');
+const cartCount = document.getElementById('cartCount');
+const drawer = document.getElementById('drawer');
+const cartItemsDiv = document.getElementById('cartItems');
+const subtotalEl = document.getElementById('subtotal');
+const grandEl = document.getElementById('grand');
+document.getElementById('year').textContent = new Date().getFullYear();
+function fmt(n){ return '৳'+n }
+
+/* ---------- UI helpers ---------- */
+function openModal(id){ document.getElementById(id).classList.add('open') }
+function closeModal(id){ document.getElementById(id).classList.remove('open') }
+document.getElementById('btnSupport').onclick=()=>openModal('modalSupport');
+document.getElementById('btnCart').onclick=()=>toggleDrawer(true);
+document.getElementById('btnProfile').onclick=async()=>{
+  const { data:{user} } = await sb.auth.getUser();
+  if(!user) openModal('modalAuth'); else {
+    const meta = user.user_metadata||{};
+    document.getElementById('pName').value=meta.name||'';
+    document.getElementById('pPhone').value=meta.phone||'';
+    document.getElementById('pEmail').value=user.email||'';
+    openModal('modalProfile');
+  }
+};
+document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m) m.classList.remove('open') }));
+document.getElementById('search').addEventListener('input', e=>{
+  const q=e.target.value.toLowerCase();
+  renderProducts(state.products.filter(p=>p.name.toLowerCase().includes(q)));
+});
+document.querySelectorAll('.chip').forEach(c=>{
+  c.onclick=()=>{
+    const cat=c.dataset.cat; const q=document.getElementById('search').value.trim().toLowerCase();
+    let list = state.products.filter(p=>cat==='all'||p.category===cat||cat==='best'&&p.price<150);
+    if(q) list = list.filter(p=>p.name.toLowerCase().includes(q));
+    renderProducts(list);
+  }
+});
+
+/* ---------- Products ---------- */
+async function loadProducts(){
+  const res = await fetch('/api/products'); const ps = await res.json();
+  state.products = ps; renderProducts(ps);
+}
+function renderProducts(list){
+  grid.innerHTML='';
+  list.forEach(p=>{
+    const el=document.createElement('div'); el.className='card';
+    el.innerHTML=`
+      <img src="${p.image||'https://picsum.photos/seed/'+p._id+'/400/300'}" alt="${p.name}">
+      <div class="title">${p.name}</div>
+      <div class="muted">Cat: ${p.category||'-'}</div>
+      <div class="price">${fmt(p.price)}</div>
+      <div class="row">
+        <button class="btn ghost" onclick="addToCart('${p._id}')">Add to Cart</button>
+        <div class="qty">
+          <button onclick="dec('${p._id}')">−</button>
+          <span id="q_${p._id}">0</span>
+          <button onclick="inc('${p._id}')">+</button>
+        </div>
+      </div>
+    `;
+    grid.appendChild(el);
+  });
+  syncQtyBadges(); updateCartUI();
+}
+function syncQtyBadges(){
+  state.products.forEach(p=>{
+    const el=document.getElementById('q_'+p._id);
+    if(el) el.textContent = state.cart.find(x=>x.id===p._id)?.qty || 0;
+  });
+}
+
+/* ---------- Cart ---------- */
+function toggleDrawer(open){ drawer.classList.toggle('open',open) }
+function addToCart(id){ inc(id); toggleDrawer(true) }
+function inc(id){
+  const p = state.products.find(p=>p._id===id); if(!p) return;
+  let it = state.cart.find(x=>x.id===id);
+  if(!it){ it={id,qty:0,price:p.price,name:p.name,img:p.image}; state.cart.push(it) }
+  it.qty++; saveAll(); updateCartUI(); syncQtyBadges();
+}
+function dec(id){
+  const it = state.cart.find(x=>x.id===id); if(!it) return;
+  it.qty--; if(it.qty<=0){ state.cart=state.cart.filter(x=>x.id!==id) }
+  saveAll(); updateCartUI(); syncQtyBadges();
+}
+function clearCart(){ state.cart=[]; saveAll(); updateCartUI(); }
+function updateCartUI(){
+  const count = state.cart.reduce((a,b)=>a+b.qty,0);
+  cartCount.textContent=count; document.getElementById('cartItemsBadge').textContent=count;
+  cartItemsDiv.innerHTML = state.cart.map(it=>`
+    <div class="cart-item">
+      <img src="${it.img||'https://picsum.photos/seed/'+it.id+'/100/100'}">
+      <div><div class="title">${it.name}</div><div class="muted">${fmt(it.price)} × ${it.qty}</div></div>
+      <div class="qty">
+        <button onclick="dec('${it.id}')">−</button><span>${it.qty}</span><button onclick="inc('${it.id}')">+</button>
+      </div>
+    </div>
+  `).join('');
+  const subtotal = state.cart.reduce((s,i)=>s+i.price*i.qty,0);
+  const shipping = subtotal>500?0:40;
+  subtotalEl.textContent=fmt(subtotal);
+  document.getElementById('shipping').textContent=fmt(shipping);
+  grandEl.textContent=fmt(subtotal+shipping);
+}
+
+/* ---------- Auth ---------- */
+async function authSignup(){
+  const email=document.getElementById('authEmail').value.trim();
+  const password=document.getElementById('authPass').value.trim();
+  if(!email||!password) return alert('ইমেইল/পাসওয়ার্ড দিন');
+  const { error } = await sb.auth.signUp({ email, password });
+  if(error) return alert(error.message);
+  alert('সাইন-আপ সফল, ইনবক্স চেক করুন (যদি কনফার্মেশন অন থাকে)');
+  closeModal('modalAuth');
+}
+async function authLogin(){
+  const email=document.getElementById('authEmail').value.trim();
+  const password=document.getElementById('authPass').value.trim();
+  if(!email||!password) return alert('ইমেইল/পাসওয়ার্ড দিন');
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  if(error) return alert(error.message);
+  alert('লগইন হয়েছে'); closeModal('modalAuth');
+}
+async function authLogout(){ await sb.auth.signOut(); alert('লগআউট'); closeModal('modalProfile'); }
+
+/* ---------- Profile ---------- */
+async function saveProfile(){
+  const name=document.getElementById('pName').value;
+  const phone=document.getElementById('pPhone').value;
+  const { data:{user} } = await sb.auth.getUser(); if(!user) return;
+  await sb.auth.updateUser({ data:{ name, phone } });
+  alert('প্রোফাইল সেভড'); 
+}
+
+/* ---------- Checkout ---------- */
+async function beginCheckout(){
+  if(state.cart.length===0) return alert('কার্ট খালি');
+  const { data:{user} } = await sb.auth.getUser();
+  if(!user) return openModal('modalAuth');
+  document.getElementById('chkName').value = user.user_metadata?.name||'';
+  document.getElementById('chkPhone').value = user.user_metadata?.phone||'';
+  document.getElementById('chkTotal').textContent = grandEl.textContent;
+  openModal('modalCheckout');
+}
+async function placeOrder(){
+  const { data:{user, session} } = await sb.auth.getSession();
+  if(!user || !session) return openModal('modalAuth');
+  const body = {
+    name: document.getElementById('chkName').value,
+    phone: document.getElementById('chkPhone').value,
+    address: document.getElementById('chkAddress').value,
+    lat: document.getElementById('chkLat').value,
+    lng: document.getElementById('chkLng').value,
+    pay: document.getElementById('chkPay').value,
+    note: document.getElementById('chkNote').value,
+    items: state.cart.map(c=>({ id:c.id, qty:c.qty }))
+  };
+  if(!body.address) return alert('ডেলিভারি ঠিকানা দিন');
+  const res = await fetch('/api/orders', {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+session.access_token },
+    body: JSON.stringify(body)
+  });
+  const data = await res.json();
+  if(!res.ok) return alert(data.error||'অর্ডার ফেল্ড');
+  clearCart(); closeModal('modalCheckout'); toggleDrawer(false);
+  alert('অর্ডার রিসিভড ✅');
+}
+
+/* ---------- Boot ---------- */
+loadProducts();
+</script>
+</body>
+</html>
