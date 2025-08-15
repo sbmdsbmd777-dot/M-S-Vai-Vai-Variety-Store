@@ -1,5 +1,10 @@
 {
   "version": 2,
+  "functions": {
+    "api/server.js": {
+      "runtime": "nodejs"
+    }
+  },
   "routes": [
     { "src": "/api/(.*)", "dest": "/api/server.js" },
     { "src": "/admin", "dest": "/admin.html" },
